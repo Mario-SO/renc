@@ -2,16 +2,66 @@ name: release
 
 on:
   push:
-    tags:
-      - "v*"
+    branches:
+      - main
 
 jobs:
   publish:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: dtolnay/rust-toolchain@stable
-      - run: cargo test
-      - run: cargo publish
+      - name: Check bump commit
+        id: check
+        run: |
+          if [ "${{ github.actor }}" = "github-actions[bot]" ]; then
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          msg=$(git log -1 --pretty=%B)
+          if echo "$msg" | grep -Eq '^bump\\((patch|minor|major)\\)$'; then
+            kind=$(echo "$msg" | sed -E 's/^bump\\((patch|minor|major)\\)$/\\1/')
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            echo "kind=$kind" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Bump version
+        if: steps.check.outputs.run == 'true'
+        id: bump
+        run: |
+          version=$(grep -m 1 '^version = ' Cargo.toml | sed -E 's/version = "(.*)"/\\1/')
+          IFS='.' read -r major minor patch <<< "$version"
+          case "${{ steps.check.outputs.kind }}" in
+            patch) patch=$((patch + 1)) ;;
+            minor) minor=$((minor + 1)); patch=0 ;;
+            major) major=$((major + 1)); minor=0; patch=0 ;;
+          esac
+          new_version="${major}.${minor}.${patch}"
+          sed -E -i 's/^version = \".*\"/version = \"'\"$new_version\"'\"/' Cargo.toml
+          echo "new_version=$new_version" >> "$GITHUB_OUTPUT"
+      - name: Commit version bump
+        if: steps.check.outputs.run == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Cargo.toml
+          git commit -m "chore: bump version to ${{ steps.bump.outputs.new_version }}"
+          git push origin HEAD:${{ github.ref_name }}
+      - name: Create tag
+        if: steps.check.outputs.run == 'true'
+        run: |
+          git tag "v${{ steps.bump.outputs.new_version }}"
+          git push origin "v${{ steps.bump.outputs.new_version }}"
+      - name: Test
+        if: steps.check.outputs.run == 'true'
+        run: cargo test
+      - name: Publish
+        if: steps.check.outputs.run == 'true'
+        run: cargo publish
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
