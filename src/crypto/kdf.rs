@@ -1,6 +1,7 @@
 use argon2::{Algorithm, Argon2, Params, Version};
 use crate::RencError;
 
+/// Argon2id parameter set stored in renc headers.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct KdfParams {
     pub mem_kib: u32,
@@ -9,6 +10,7 @@ pub struct KdfParams {
 }
 
 impl KdfParams {
+    /// Default parameters for password mode.
     pub fn password_default() -> Self {
         Self {
             mem_kib: 65_536,
@@ -17,6 +19,7 @@ impl KdfParams {
         }
     }
 
+    /// Default parameters for public-key mode.
     pub fn pubkey_default() -> Self {
         Self {
             mem_kib: 1_024,
@@ -25,6 +28,7 @@ impl KdfParams {
         }
     }
 
+    /// Serialize to 12 bytes in little-endian (mem, iters, parallelism).
     pub fn to_bytes(self) -> [u8; 12] {
         let mut out = [0u8; 12];
         out[..4].copy_from_slice(&self.mem_kib.to_le_bytes());
@@ -33,6 +37,7 @@ impl KdfParams {
         out
     }
 
+    /// Deserialize from 12 bytes in little-endian.
     pub fn from_bytes(bytes: [u8; 12]) -> Self {
         let mem_kib = u32::from_le_bytes(bytes[0..4].try_into().unwrap());
         let iterations = u32::from_le_bytes(bytes[4..8].try_into().unwrap());
@@ -45,6 +50,7 @@ impl KdfParams {
     }
 }
 
+/// Derive a 32-byte key using Argon2id.
 pub fn derive_key(input: &[u8], salt: &[u8; 16], params: KdfParams) -> Result<[u8; 32], RencError> {
     let argon_params = Params::new(
         params.mem_kib,

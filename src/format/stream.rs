@@ -69,6 +69,7 @@ fn build_ad(padded_header: &[u8; HEADER_PADDED_SIZE], index: u64) -> [u8; AD_SIZ
     ad
 }
 
+/// Stream-encrypt reader to writer, returning plaintext SHA-256 hex.
 pub fn encrypt_stream<R: Read, W: Write>(
     reader: &mut R,
     writer: &mut W,
@@ -109,6 +110,7 @@ pub fn encrypt_stream<R: Read, W: Write>(
     Ok(hex::encode(hash))
 }
 
+/// Stream-decrypt reader to writer, returning plaintext SHA-256 hex.
 pub fn decrypt_stream<R: Read, W: Write>(
     reader: &mut R,
     writer: &mut W,

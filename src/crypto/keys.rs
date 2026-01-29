@@ -9,6 +9,7 @@ use zeroize::Zeroize;
 
 use crate::RencError;
 
+/// Generate a new Ed25519 keypair (public, secret seed).
 pub fn generate_ed25519_keypair() -> Result<([u8; 32], [u8; 32]), RencError> {
     let signing_key = SigningKey::generate(&mut OsRng);
     let secret = signing_key.to_bytes();
@@ -16,10 +17,12 @@ pub fn generate_ed25519_keypair() -> Result<([u8; 32], [u8; 32]), RencError> {
     Ok((public, secret))
 }
 
+/// Encode bytes as standard base64.
 pub fn encode_base64(bytes: &[u8]) -> String {
     STANDARD.encode(bytes)
 }
 
+/// Decode a base64 string into a 32-byte array.
 pub fn decode_base64_32(input: &str) -> Result<[u8; 32], RencError> {
     let bytes = STANDARD
         .decode(input.trim())
@@ -35,6 +38,7 @@ pub fn decode_base64_32(input: &str) -> Result<[u8; 32], RencError> {
     Ok(out)
 }
 
+/// Convert an Ed25519 public key to X25519 public key bytes.
 pub fn ed25519_public_to_x25519(public: &[u8; 32]) -> Result<[u8; 32], RencError> {
     let compressed = CompressedEdwardsY(*public);
     let edwards = compressed
@@ -44,6 +48,7 @@ pub fn ed25519_public_to_x25519(public: &[u8; 32]) -> Result<[u8; 32], RencError
     Ok(montgomery.to_bytes())
 }
 
+/// Convert an Ed25519 secret seed to an X25519 secret key (clamped).
 pub fn ed25519_secret_to_x25519(secret_seed: &[u8; 32]) -> [u8; 32] {
     let mut hasher = Sha512::new();
     hasher.update(secret_seed);
@@ -56,6 +61,7 @@ pub fn ed25519_secret_to_x25519(secret_seed: &[u8; 32]) -> [u8; 32] {
     out
 }
 
+/// Generate an ephemeral X25519 secret/public pair.
 pub fn generate_x25519_ephemeral() -> Result<([u8; 32], [u8; 32]), RencError> {
     let mut bytes = [0u8; 32];
     OsRng.fill_bytes(&mut bytes);
@@ -66,6 +72,7 @@ pub fn generate_x25519_ephemeral() -> Result<([u8; 32], [u8; 32]), RencError> {
     Ok((secret_bytes, public.to_bytes()))
 }
 
+/// Compute an X25519 shared secret from secret/public bytes.
 pub fn x25519_shared_secret(secret: &[u8; 32], public: &[u8; 32]) -> [u8; 32] {
     let secret = X25519Secret::from(*secret);
     let public = X25519PublicKey::from(*public);
@@ -73,12 +80,14 @@ pub fn x25519_shared_secret(secret: &[u8; 32], public: &[u8; 32]) -> [u8; 32] {
     shared.to_bytes()
 }
 
+/// Generate a random 16-byte salt.
 pub fn random_salt() -> Result<[u8; 16], RencError> {
     let mut salt = [0u8; 16];
     OsRng.fill_bytes(&mut salt);
     Ok(salt)
 }
 
+/// Generate a random 24-byte XChaCha20 nonce.
 pub fn random_nonce() -> Result<[u8; 24], RencError> {
     let mut nonce = [0u8; 24];
     OsRng.fill_bytes(&mut nonce);

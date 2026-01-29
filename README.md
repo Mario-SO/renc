@@ -13,7 +13,7 @@ renc keygen
 Encrypt with a password (password read from stdin):
 
 ```bash
-printf "my password" | renc encrypt ./file.txt --password
+echo "my password" | renc encrypt ./file.txt --password
 ```
 
 Encrypt to a recipient public key (base64 Ed25519 public key):
@@ -25,7 +25,7 @@ renc encrypt ./file.txt --to <base64_pubkey>
 Decrypt (secret read from stdin; password or secret key depends on file mode):
 
 ```bash
-printf "my password" | renc decrypt ./file.txt.renc
+echo "my password" | renc decrypt ./file.txt.renc
 ```
 
 ## JSON Events

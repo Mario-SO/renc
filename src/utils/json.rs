@@ -59,6 +59,7 @@ pub fn emit_start(path: &Path, size: u64) -> Result<(), RencError> {
     })
 }
 
+/// Emit a progress JSON event.
 pub fn emit_progress(bytes: u64, percent: f64) -> Result<(), RencError> {
     emit(&ProgressEvent {
         event: "progress",
@@ -67,6 +68,7 @@ pub fn emit_progress(bytes: u64, percent: f64) -> Result<(), RencError> {
     })
 }
 
+/// Emit a done JSON event.
 pub fn emit_done(path: &Path, hash: &str) -> Result<(), RencError> {
     let output = path
         .to_str()
@@ -78,6 +80,7 @@ pub fn emit_done(path: &Path, hash: &str) -> Result<(), RencError> {
     })
 }
 
+/// Emit an error JSON event.
 pub fn emit_error(code: &str, message: &str) -> Result<(), RencError> {
     emit(&ErrorEvent {
         event: "error",
@@ -86,6 +89,7 @@ pub fn emit_error(code: &str, message: &str) -> Result<(), RencError> {
     })
 }
 
+/// Emit a keygen JSON event.
 pub fn emit_keygen(public_key: &str, secret_key: &str) -> Result<(), RencError> {
     emit(&KeygenEvent {
         event: "keygen",

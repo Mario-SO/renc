@@ -3,6 +3,7 @@ use chacha20poly1305::{Tag, XChaCha20Poly1305, XNonce};
 
 use crate::RencError;
 
+/// Encrypt data in-place and return the detached tag.
 pub fn encrypt_in_place(
     key: &[u8; 32],
     nonce: &[u8; 24],
@@ -16,6 +17,7 @@ pub fn encrypt_in_place(
     Ok(tag.into())
 }
 
+/// Decrypt data in-place using a detached tag.
 pub fn decrypt_in_place(
     key: &[u8; 32],
     nonce: &[u8; 24],

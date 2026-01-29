@@ -1,3 +1,9 @@
+//! Rust Encryption Engine library for the renc CLI.
+//!
+//! This crate mirrors the zenc file format and provides streaming encryption
+//! and decryption with either a password (Argon2id) or recipient public key.
+//! Use the `renc` binary for the CLI and JSON event output.
+
 mod crypto;
 mod format;
 pub mod utils;
@@ -10,6 +16,7 @@ use std::io::{BufReader, BufWriter, Write};
 use std::path::{Path, PathBuf};
 use zeroize::Zeroize;
 
+/// Errors emitted by renc operations.
 #[derive(Debug)]
 pub enum RencError {
     Io(String),
@@ -82,15 +89,21 @@ impl From<std::io::Error> for RencError {
 }
 
 pub struct Keypair {
+    /// Base64-encoded Ed25519 public key (32 bytes).
     pub public_key_base64: String,
+    /// Base64-encoded Ed25519 secret key seed (32 bytes).
     pub secret_key_base64: String,
 }
 
+/// Completion info for encrypt/decrypt operations.
 pub struct DoneInfo {
+    /// Output file path.
     pub output: PathBuf,
+    /// Hex-encoded SHA-256 of the plaintext.
     pub hash_hex: String,
 }
 
+/// Generate a new Ed25519 keypair (base64-encoded) for public-key mode.
 pub fn generate_keypair() -> Result<Keypair, RencError> {
     let (public, secret) = crypto::keys::generate_ed25519_keypair()?;
     let public_key_base64 = crypto::keys::encode_base64(&public);
@@ -101,12 +114,14 @@ pub fn generate_keypair() -> Result<Keypair, RencError> {
     })
 }
 
+/// Read and parse the renc header from an encrypted file.
 pub fn read_header_from_file(path: &Path) -> Result<Header, RencError> {
     let file = File::open(path)?;
     let mut reader = BufReader::new(file);
     format::header::Header::read_from(&mut reader)
 }
 
+/// Encrypt a file using a password-derived key (Argon2id).
 pub fn encrypt_file_with_password(
     input: &Path,
     output: &Path,
@@ -145,6 +160,7 @@ pub fn encrypt_file_with_password(
     })
 }
 
+/// Encrypt a file to a recipient Ed25519 public key (base64).
 pub fn encrypt_file_with_pubkey(
     input: &Path,
     output: &Path,
@@ -189,6 +205,7 @@ pub fn encrypt_file_with_pubkey(
     })
 }
 
+/// Decrypt a password-mode file to the given output path.
 pub fn decrypt_file_with_password(
     input: &Path,
     output: &Path,
@@ -224,6 +241,7 @@ pub fn decrypt_file_with_password(
     })
 }
 
+/// Decrypt a public-key mode file using the recipient secret key (base64).
 pub fn decrypt_file_with_secret(
     input: &Path,
     output: &Path,
