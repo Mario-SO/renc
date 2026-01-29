@@ -22,6 +22,15 @@ jobs:
             echo "run=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
+          msg_git=$(git log -1 --pretty=%B)
+          echo "commit message:"
+          echo "$msg_git"
+          if echo "$msg_git" | grep -E -i -q 'bump\\((patch|minor|major)\\)'; then
+            kind=$(echo "$msg_git" | sed -E 's/.*bump\\((patch|minor|major)\\).*/\\1/I')
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            echo "kind=$kind" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           python - <<'PY' > /tmp/bump_output
           import json
           import os
