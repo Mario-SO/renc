@@ -70,7 +70,7 @@ jobs:
           with open("Cargo.toml", "r", encoding="utf-8") as f:
               data = f.read()
 
-          match = re.search(r'^version\\s*=\\s*"([^"]+)"', data, re.M)
+          match = re.search(r'^version\s*=\s*"([^"]+)"', data, re.M)
           if not match:
               raise SystemExit("version not found in Cargo.toml")
 
@@ -91,7 +91,7 @@ jobs:
 
           new_version = f"{major}.{minor}.{patch}"
           data = re.sub(
-              r'^version\\s*=\\s*"[^"]+"',
+              r'^version\s*=\s*"[^"]+"',
               f'version = "{new_version}"',
               data,
               count=1,
