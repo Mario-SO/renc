@@ -22,21 +22,33 @@ jobs:
             echo "run=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          before="${{ github.event.before }}"
-          if [ -z "$before" ] || [ "$before" = "0000000000000000000000000000000000000000" ]; then
-            messages="${{ github.event.head_commit.message }}"
-          else
-            range="${before}..${{ github.sha }}"
-            messages=$(git log --format=%B "$range")
-          fi
-          match=$(echo "$messages" | grep -E -i -o 'bump\\((patch|minor|major)\\)' | head -n 1 | tr 'A-Z' 'a-z' || true)
-          if [ -n "$match" ]; then
-            kind=$(echo "$match" | sed -E 's/bump\\((patch|minor|major)\\)/\\1/')
-            echo "run=true" >> "$GITHUB_OUTPUT"
-            echo "kind=$kind" >> "$GITHUB_OUTPUT"
-          else
-            echo "run=false" >> "$GITHUB_OUTPUT"
-          fi
+          python - <<'PY' > /tmp/bump_output
+          import json
+          import os
+          import re
+
+          with open(os.environ["GITHUB_EVENT_PATH"], "r", encoding="utf-8") as f:
+              event = json.load(f)
+
+          messages = []
+          for commit in event.get("commits", []):
+              msg = commit.get("message", "")
+              if msg:
+                  messages.append(msg)
+          head = event.get("head_commit")
+          if head and head.get("message"):
+              messages.append(head["message"])
+
+          text = "\n".join(messages)
+          match = re.search(r"bump\\((patch|minor|major)\\)", text, re.IGNORECASE)
+          if match:
+              print("run=true")
+              print(f"kind={match.group(1).lower()}")
+          else:
+              print("run=false")
+          PY
+          cat /tmp/bump_output >> "$GITHUB_OUTPUT"
+          cat /tmp/bump_output
       - name: Bump version
         if: steps.check.outputs.run == 'true'
         id: bump
