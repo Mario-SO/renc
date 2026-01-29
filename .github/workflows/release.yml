@@ -62,16 +62,48 @@ jobs:
         if: steps.check.outputs.run == 'true'
         id: bump
         run: |
-          version=$(grep -m 1 '^version = ' Cargo.toml | sed -E 's/version = "(.*)"/\\1/')
-          IFS='.' read -r major minor patch <<< "$version"
-          case "${{ steps.check.outputs.kind }}" in
-            patch) patch=$((patch + 1)) ;;
-            minor) minor=$((minor + 1)); patch=0 ;;
-            major) major=$((major + 1)); minor=0; patch=0 ;;
-          esac
-          new_version="${major}.${minor}.${patch}"
-          sed -E -i 's/^version = \".*\"/version = \"'\"$new_version\"'\"/' Cargo.toml
-          echo "new_version=$new_version" >> "$GITHUB_OUTPUT"
+          BUMP_KIND="${{ steps.check.outputs.kind }}" python - <<'PY' > /tmp/bump_output
+          import os
+          import re
+
+          kind = os.environ["BUMP_KIND"]
+          with open("Cargo.toml", "r", encoding="utf-8") as f:
+              data = f.read()
+
+          match = re.search(r'^version\\s*=\\s*"([^"]+)"', data, re.M)
+          if not match:
+              raise SystemExit("version not found in Cargo.toml")
+
+          version = match.group(1)
+          major, minor, patch = [int(part) for part in version.split(".")]
+
+          if kind == "patch":
+              patch += 1
+          elif kind == "minor":
+              minor += 1
+              patch = 0
+          elif kind == "major":
+              major += 1
+              minor = 0
+              patch = 0
+          else:
+              raise SystemExit(f"unsupported bump kind: {kind}")
+
+          new_version = f"{major}.{minor}.{patch}"
+          data = re.sub(
+              r'^version\\s*=\\s*"[^"]+"',
+              f'version = "{new_version}"',
+              data,
+              count=1,
+              flags=re.M,
+          )
+
+          with open("Cargo.toml", "w", encoding="utf-8") as f:
+              f.write(data)
+
+          print(f"new_version={new_version}")
+          PY
+          cat /tmp/bump_output >> "$GITHUB_OUTPUT"
       - name: Commit version bump
         if: steps.check.outputs.run == 'true'
         run: |
