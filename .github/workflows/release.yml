@@ -23,8 +23,8 @@ jobs:
             exit 0
           fi
           msg=$(git log -1 --pretty=%B)
-          if echo "$msg" | grep -Eq '^bump\\((patch|minor|major)\\)$'; then
-            kind=$(echo "$msg" | sed -E 's/^bump\\((patch|minor|major)\\)$/\\1/')
+          if echo "$msg" | grep -Eq '^bump\\((patch|minor|major)\\)'; then
+            kind=$(echo "$msg" | sed -E 's/^bump\\((patch|minor|major)\\).*$/\\1/')
             echo "run=true" >> "$GITHUB_OUTPUT"
             echo "kind=$kind" >> "$GITHUB_OUTPUT"
           else
