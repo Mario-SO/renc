@@ -22,9 +22,16 @@ jobs:
             echo "run=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          msg=$(git log -1 --pretty=%B)
-          if echo "$msg" | grep -Eq '^bump\\((patch|minor|major)\\)'; then
-            kind=$(echo "$msg" | sed -E 's/^bump\\((patch|minor|major)\\).*$/\\1/')
+          before="${{ github.event.before }}"
+          if [ -z "$before" ] || [ "$before" = "0000000000000000000000000000000000000000" ]; then
+            messages="${{ github.event.head_commit.message }}"
+          else
+            range="${before}..${{ github.sha }}"
+            messages=$(git log --format=%B "$range")
+          fi
+          match=$(echo "$messages" | grep -E -i -o 'bump\\((patch|minor|major)\\)' | head -n 1 | tr 'A-Z' 'a-z' || true)
+          if [ -n "$match" ]; then
+            kind=$(echo "$match" | sed -E 's/bump\\((patch|minor|major)\\)/\\1/')
             echo "run=true" >> "$GITHUB_OUTPUT"
             echo "kind=$kind" >> "$GITHUB_OUTPUT"
           else
