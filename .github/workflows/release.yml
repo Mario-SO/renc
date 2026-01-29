@@ -25,8 +25,8 @@ jobs:
           msg_git=$(git log -1 --pretty=%B)
           echo "commit message:"
           echo "$msg_git"
-          if echo "$msg_git" | grep -E -i -q 'bump\\((patch|minor|major)\\)'; then
-            kind=$(echo "$msg_git" | sed -E 's/.*bump\\((patch|minor|major)\\).*/\\1/I')
+          if echo "$msg_git" | grep -E -i -q 'bump\((patch|minor|major)\)'; then
+            kind=$(echo "$msg_git" | sed -E 's/.*bump\((patch|minor|major)\).*/\1/I')
             echo "run=true" >> "$GITHUB_OUTPUT"
             echo "kind=$kind" >> "$GITHUB_OUTPUT"
             exit 0
@@ -49,7 +49,7 @@ jobs:
               messages.append(head["message"])
 
           text = "\n".join(messages)
-          match = re.search(r"bump\\((patch|minor|major)\\)", text, re.IGNORECASE)
+          match = re.search(r"bump\((patch|minor|major)\)", text, re.IGNORECASE)
           if match:
               print("run=true")
               print(f"kind={match.group(1).lower()}")
