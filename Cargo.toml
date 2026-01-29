@@ -1,0 +1,33 @@
+[package]
+name = "renc"
+version = "0.1.0"
+edition = "2024"
+description = "Rust Encryption Engine compatible with the zenc file format"
+license = "MIT OR Apache-2.0"
+readme = "README.md"
+repository = "https://github.com/your-org-or-user/renc"
+documentation = "https://docs.rs/renc"
+keywords = ["encryption", "cli", "xchacha20", "argon2", "streaming"]
+categories = ["command-line-utilities", "cryptography"]
+
+[lib]
+name = "renc"
+
+[[bin]]
+name = "renc"
+path = "src/main.rs"
+
+[dependencies]
+argon2 = "0.5.3"
+base64 = "0.22.1"
+chacha20poly1305 = "0.10.1"
+clap = { version = "4.5.49", features = ["derive"] }
+curve25519-dalek = "4.1.3"
+ed25519-dalek = { version = "2.2.0", features = ["rand_core"] }
+hex = "0.4.3"
+rand_core = "0.6.4"
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.149"
+sha2 = "0.10.9"
+x25519-dalek = { version = "2.0.1", features = ["static_secrets"] }
+zeroize = { version = "1.8.2", features = ["zeroize_derive"] }
