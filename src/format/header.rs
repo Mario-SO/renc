@@ -1,7 +1,7 @@
 use std::io::Read;
 
-use crate::crypto::kdf::KdfParams;
 use crate::RencError;
+use crate::crypto::kdf::KdfParams;
 
 /// Fixed header size in bytes.
 pub const HEADER_SIZE: usize = 4 + 1 + 1 + 12 + 16 + 32 + 24;

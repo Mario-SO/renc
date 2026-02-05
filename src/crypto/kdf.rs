@@ -1,5 +1,5 @@
-use argon2::{Algorithm, Argon2, Params, Version};
 use crate::RencError;
+use argon2::{Algorithm, Argon2, Params, Version};
 
 /// Argon2id parameter set stored in renc headers.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

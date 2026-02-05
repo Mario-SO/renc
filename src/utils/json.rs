@@ -121,6 +121,9 @@ mod tests {
             hash: "abc123",
         };
         let json = serde_json::to_string(&event).expect("json");
-        assert_eq!(json, r#"{"event":"done","output":"/tmp/out","hash":"abc123"}"#);
+        assert_eq!(
+            json,
+            r#"{"event":"done","output":"/tmp/out","hash":"abc123"}"#
+        );
     }
 }

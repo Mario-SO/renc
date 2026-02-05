@@ -1,6 +1,6 @@
 //! Rust Encryption Engine library for the renc CLI.
 //!
-//! This crate mirrors the zenc file format and provides streaming encryption
+//! This crate provides streaming encryption
 //! and decryption with either a password (Argon2id) or recipient public key.
 //! Use the `renc` binary for the CLI and JSON event output.
 
@@ -286,7 +286,7 @@ pub fn decrypt_file_with_secret(
 #[cfg(test)]
 mod tests {
     use crate::crypto::kdf::KdfParams;
-    use crate::format::header::{Header, Mode, HEADER_SIZE};
+    use crate::format::header::{HEADER_SIZE, Header, Mode};
 
     #[test]
     fn header_round_trip() {

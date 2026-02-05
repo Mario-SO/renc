@@ -40,10 +40,7 @@ fn run() -> Result<(), RencError> {
     match cli.command {
         Commands::Keygen => {
             let keypair = renc::generate_keypair()?;
-            renc::utils::json::emit_keygen(
-                &keypair.public_key_base64,
-                &keypair.secret_key_base64,
-            )?;
+            renc::utils::json::emit_keygen(&keypair.public_key_base64, &keypair.secret_key_base64)?;
         }
         Commands::Encrypt { file, password, to } => {
             if password == to.is_some() {
@@ -55,18 +52,13 @@ fn run() -> Result<(), RencError> {
             renc::utils::json::emit_start(&file, size)?;
 
             let output = encrypt_output_path(&file)?;
-            let mut progress = |bytes: u64, percent: f64| {
-                renc::utils::json::emit_progress(bytes, percent)
-            };
+            let mut progress =
+                |bytes: u64, percent: f64| renc::utils::json::emit_progress(bytes, percent);
 
             if password {
                 let mut secret = read_stdin_secret()?;
-                let result = renc::encrypt_file_with_password(
-                    &file,
-                    &output,
-                    &secret,
-                    Some(&mut progress),
-                );
+                let result =
+                    renc::encrypt_file_with_password(&file, &output, &secret, Some(&mut progress));
                 secret.zeroize();
                 let done = result?;
                 renc::utils::json::emit_done(&done.output, &done.hash_hex)?;
@@ -86,9 +78,8 @@ fn run() -> Result<(), RencError> {
             renc::utils::json::emit_start(&file, size)?;
 
             let output = decrypt_output_path(&file)?;
-            let mut progress = |bytes: u64, percent: f64| {
-                renc::utils::json::emit_progress(bytes, percent)
-            };
+            let mut progress =
+                |bytes: u64, percent: f64| renc::utils::json::emit_progress(bytes, percent);
 
             match header.mode {
                 Mode::Password => {
@@ -127,10 +118,7 @@ fn run() -> Result<(), RencError> {
 fn read_stdin_secret() -> Result<Vec<u8>, RencError> {
     let mut buffer = Vec::new();
     std::io::stdin().read_to_end(&mut buffer)?;
-    while buffer
-        .last()
-        .is_some_and(|byte| byte.is_ascii_whitespace())
-    {
+    while buffer.last().is_some_and(|byte| byte.is_ascii_whitespace()) {
         buffer.pop();
     }
     if buffer.is_empty() {

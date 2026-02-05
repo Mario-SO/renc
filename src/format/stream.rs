@@ -2,9 +2,9 @@ use std::io::{Read, Write};
 
 use sha2::{Digest, Sha256};
 
-use crate::crypto::aead;
-use crate::format::header::{Header, AD_SIZE, HEADER_PADDED_SIZE, HEADER_SIZE};
 use crate::RencError;
+use crate::crypto::aead;
+use crate::format::header::{AD_SIZE, HEADER_PADDED_SIZE, HEADER_SIZE, Header};
 
 const CHUNK_SIZE: usize = 64 * 1024;
 const TAG_SIZE: usize = 16;
@@ -195,7 +195,7 @@ fn plaintext_size_from_payload(payload_size: u64) -> Result<u64, RencError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::crypto::kdf::{derive_key, KdfParams};
+    use crate::crypto::kdf::{KdfParams, derive_key};
     use std::io::Cursor;
 
     #[test]

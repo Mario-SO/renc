@@ -1,5 +1,5 @@
-use base64::engine::general_purpose::STANDARD;
 use base64::Engine as _;
+use base64::engine::general_purpose::STANDARD;
 use curve25519_dalek::edwards::CompressedEdwardsY;
 use ed25519_dalek::SigningKey;
 use rand_core::{OsRng, RngCore};
