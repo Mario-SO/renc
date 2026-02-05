@@ -10,11 +10,11 @@ use zeroize::Zeroize;
 use crate::RencError;
 
 /// Generate a new Ed25519 keypair (public, secret seed).
-pub fn generate_ed25519_keypair() -> Result<([u8; 32], [u8; 32]), RencError> {
+pub fn generate_ed25519_keypair() -> ([u8; 32], [u8; 32]) {
     let signing_key = SigningKey::generate(&mut OsRng);
     let secret = signing_key.to_bytes();
     let public = signing_key.verifying_key().to_bytes();
-    Ok((public, secret))
+    (public, secret)
 }
 
 /// Encode bytes as standard base64.
@@ -27,15 +27,9 @@ pub fn decode_base64_32(input: &str) -> Result<[u8; 32], RencError> {
     let bytes = STANDARD
         .decode(input.trim())
         .map_err(|err| RencError::InvalidKey(format!("Invalid base64: {err}")))?;
-    if bytes.len() != 32 {
-        return Err(RencError::InvalidKey(format!(
-            "Expected 32 bytes, got {}",
-            bytes.len()
-        )));
-    }
-    let mut out = [0u8; 32];
-    out.copy_from_slice(&bytes);
-    Ok(out)
+    bytes
+        .try_into()
+        .map_err(|v: Vec<u8>| RencError::InvalidKey(format!("Expected 32 bytes, got {}", v.len())))
 }
 
 /// Convert an Ed25519 public key to X25519 public key bytes.
@@ -62,14 +56,14 @@ pub fn ed25519_secret_to_x25519(secret_seed: &[u8; 32]) -> [u8; 32] {
 }
 
 /// Generate an ephemeral X25519 secret/public pair.
-pub fn generate_x25519_ephemeral() -> Result<([u8; 32], [u8; 32]), RencError> {
+pub fn generate_x25519_ephemeral() -> ([u8; 32], [u8; 32]) {
     let mut bytes = [0u8; 32];
     OsRng.fill_bytes(&mut bytes);
     let secret = X25519Secret::from(bytes);
     let public = X25519PublicKey::from(&secret);
     let secret_bytes = secret.to_bytes();
     bytes.zeroize();
-    Ok((secret_bytes, public.to_bytes()))
+    (secret_bytes, public.to_bytes())
 }
 
 /// Compute an X25519 shared secret from secret/public bytes.
@@ -81,17 +75,17 @@ pub fn x25519_shared_secret(secret: &[u8; 32], public: &[u8; 32]) -> [u8; 32] {
 }
 
 /// Generate a random 16-byte salt.
-pub fn random_salt() -> Result<[u8; 16], RencError> {
+pub fn random_salt() -> [u8; 16] {
     let mut salt = [0u8; 16];
     OsRng.fill_bytes(&mut salt);
-    Ok(salt)
+    salt
 }
 
 /// Generate a random 24-byte XChaCha20 nonce.
-pub fn random_nonce() -> Result<[u8; 24], RencError> {
+pub fn random_nonce() -> [u8; 24] {
     let mut nonce = [0u8; 24];
     OsRng.fill_bytes(&mut nonce);
-    Ok(nonce)
+    nonce
 }
 
 #[cfg(test)]
@@ -100,7 +94,7 @@ mod tests {
 
     #[test]
     fn ed25519_to_x25519_round_trip() {
-        let (public, secret) = generate_ed25519_keypair().expect("keypair");
+        let (public, secret) = generate_ed25519_keypair();
         let x25519_secret = ed25519_secret_to_x25519(&secret);
         let x25519_public = ed25519_public_to_x25519(&public).expect("public");
         let shared1 = x25519_shared_secret(&x25519_secret, &x25519_public);
@@ -110,11 +104,11 @@ mod tests {
 
     #[test]
     fn shared_secret_matches_between_peers() {
-        let (recipient_public, recipient_secret) = generate_ed25519_keypair().expect("keys");
+        let (recipient_public, recipient_secret) = generate_ed25519_keypair();
         let recipient_x_public =
             ed25519_public_to_x25519(&recipient_public).expect("recipient public");
         let recipient_x_secret = ed25519_secret_to_x25519(&recipient_secret);
-        let (ephemeral_secret, ephemeral_public) = generate_x25519_ephemeral().expect("ephemeral");
+        let (ephemeral_secret, ephemeral_public) = generate_x25519_ephemeral();
 
         let shared_sender = x25519_shared_secret(&ephemeral_secret, &recipient_x_public);
         let shared_receiver = x25519_shared_secret(&recipient_x_secret, &ephemeral_public);

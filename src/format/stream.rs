@@ -46,11 +46,12 @@ impl ProgressTracker {
     }
 }
 
-fn padded_header_bytes(header: &Header) -> [u8; HEADER_PADDED_SIZE] {
+fn init_ad(header: &Header) -> [u8; AD_SIZE] {
+    let mut ad = [0u8; AD_SIZE];
     let mut padded = [0u8; HEADER_PADDED_SIZE];
-    let bytes = header.serialize();
-    padded[..HEADER_SIZE].copy_from_slice(&bytes);
-    padded
+    padded[..HEADER_SIZE].copy_from_slice(&header.serialize());
+    ad[..HEADER_PADDED_SIZE].copy_from_slice(&padded);
+    ad
 }
 
 fn derive_nonce(base: &[u8; 24], index: u64) -> [u8; 24] {
@@ -62,11 +63,11 @@ fn derive_nonce(base: &[u8; 24], index: u64) -> [u8; 24] {
     nonce
 }
 
-fn build_ad(padded_header: &[u8; HEADER_PADDED_SIZE], index: u64) -> [u8; AD_SIZE] {
-    let mut ad = [0u8; AD_SIZE];
-    ad[..HEADER_PADDED_SIZE].copy_from_slice(padded_header);
-    ad[HEADER_PADDED_SIZE..].copy_from_slice(&index.to_le_bytes());
-    ad
+fn read_exact_eof<R: Read>(reader: &mut R, buf: &mut [u8]) -> Result<(), RencError> {
+    reader.read_exact(buf).map_err(|err| match err.kind() {
+        std::io::ErrorKind::UnexpectedEof => RencError::UnexpectedEof,
+        _ => RencError::Io(err.to_string()),
+    })
 }
 
 /// Stream-encrypt reader to writer, returning plaintext SHA-256 hex.
@@ -78,7 +79,7 @@ pub fn encrypt_stream<R: Read, W: Write>(
     total_plaintext: u64,
     progress: &mut Option<&mut dyn FnMut(u64, f64) -> Result<(), RencError>>,
 ) -> Result<String, RencError> {
-    let padded_header = padded_header_bytes(header);
+    let mut ad = init_ad(header);
     let mut buffer = vec![0u8; CHUNK_SIZE];
     let mut hasher = Sha256::new();
     let mut index = 0u64;
@@ -94,7 +95,7 @@ pub fn encrypt_stream<R: Read, W: Write>(
         hasher.update(&chunk[..]);
 
         let nonce = derive_nonce(&header.nonce, index);
-        let ad = build_ad(&padded_header, index);
+        ad[HEADER_PADDED_SIZE..].copy_from_slice(&index.to_le_bytes());
         let tag = aead::encrypt_in_place(key, &nonce, &ad, chunk)?;
 
         writer.write_all(chunk)?;
@@ -125,12 +126,14 @@ pub fn decrypt_stream<R: Read, W: Write>(
     let payload_size = encrypted_size - HEADER_SIZE as u64;
     let total_plaintext = plaintext_size_from_payload(payload_size)?;
 
-    let padded_header = padded_header_bytes(header);
+    let mut ad = init_ad(header);
     let mut hasher = Sha256::new();
     let mut index = 0u64;
     let mut processed = 0u64;
     let mut tracker = ProgressTracker::new(total_plaintext);
 
+    let mut buffer = vec![0u8; CHUNK_SIZE];
+    let mut tag = [0u8; TAG_SIZE];
     let mut payload_remaining = payload_size;
 
     while payload_remaining > 0 {
@@ -139,35 +142,24 @@ pub fn decrypt_stream<R: Read, W: Write>(
         }
 
         let chunk_len = if payload_remaining > (CHUNK_SIZE + TAG_SIZE) as u64 {
-            CHUNK_SIZE as u64
+            CHUNK_SIZE
         } else {
-            payload_remaining - TAG_SIZE as u64
+            (payload_remaining - TAG_SIZE as u64) as usize
         };
 
-        let mut buffer = vec![0u8; chunk_len as usize];
-        reader
-            .read_exact(&mut buffer)
-            .map_err(|err| match err.kind() {
-                std::io::ErrorKind::UnexpectedEof => RencError::UnexpectedEof,
-                _ => RencError::Io(err.to_string()),
-            })?;
-        let mut tag = [0u8; TAG_SIZE];
-        reader
-            .read_exact(&mut tag)
-            .map_err(|err| match err.kind() {
-                std::io::ErrorKind::UnexpectedEof => RencError::UnexpectedEof,
-                _ => RencError::Io(err.to_string()),
-            })?;
+        let chunk = &mut buffer[..chunk_len];
+        read_exact_eof(reader, chunk)?;
+        read_exact_eof(reader, &mut tag)?;
 
         let nonce = derive_nonce(&header.nonce, index);
-        let ad = build_ad(&padded_header, index);
-        aead::decrypt_in_place(key, &nonce, &ad, &mut buffer, &tag)?;
-        hasher.update(&buffer);
-        writer.write_all(&buffer)?;
+        ad[HEADER_PADDED_SIZE..].copy_from_slice(&index.to_le_bytes());
+        aead::decrypt_in_place(key, &nonce, &ad, chunk, &tag)?;
+        hasher.update(&*chunk);
+        writer.write_all(chunk)?;
 
-        processed += buffer.len() as u64;
+        processed += chunk_len as u64;
         tracker.emit_if_needed(processed, progress)?;
-        payload_remaining -= chunk_len + TAG_SIZE as u64;
+        payload_remaining -= chunk_len as u64 + TAG_SIZE as u64;
         index += 1;
     }
 

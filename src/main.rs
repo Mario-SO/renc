@@ -30,7 +30,7 @@ enum Commands {
 
 fn main() {
     if let Err(err) = run() {
-        let _ = renc::utils::json::emit_error(err.code(), &err.message());
+        let _ = renc::utils::json::emit_error(err.code(), &err.to_string());
         std::process::exit(1);
     }
 }
@@ -39,7 +39,7 @@ fn run() -> Result<(), RencError> {
     let cli = Cli::parse();
     match cli.command {
         Commands::Keygen => {
-            let keypair = renc::generate_keypair()?;
+            let keypair = renc::generate_keypair();
             renc::utils::json::emit_keygen(&keypair.public_key_base64, &keypair.secret_key_base64)?;
         }
         Commands::Encrypt { file, password, to } => {
@@ -134,10 +134,7 @@ fn encrypt_output_path(input: &Path) -> Result<PathBuf, RencError> {
         .file_name()
         .and_then(|name| name.to_str())
         .ok_or_else(|| RencError::InvalidArguments("Invalid input filename".to_string()))?;
-    let mut new_name = String::with_capacity(file_name.len() + 5);
-    new_name.push_str(file_name);
-    new_name.push_str(".renc");
-    Ok(input.with_file_name(new_name))
+    Ok(input.with_file_name(format!("{file_name}.renc")))
 }
 
 fn decrypt_output_path(input: &Path) -> Result<PathBuf, RencError> {

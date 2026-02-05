@@ -52,31 +52,25 @@ impl RencError {
             RencError::Crypto(_) => "Crypto",
         }
     }
-
-    pub fn message(&self) -> String {
-        match self {
-            RencError::Io(err) => err.clone(),
-            RencError::InvalidMagic => "Invalid magic header".to_string(),
-            RencError::UnsupportedVersion(version) => {
-                format!("Unsupported version {version}")
-            }
-            RencError::InvalidMode(mode) => format!("Invalid mode {mode}"),
-            RencError::PasswordRequired => "Password required".to_string(),
-            RencError::SecretKeyRequired => "Secret key required".to_string(),
-            RencError::AuthenticationFailed => "Authentication failed".to_string(),
-            RencError::InvalidEncryptedSize => "Invalid encrypted size".to_string(),
-            RencError::UnexpectedEof => "Unexpected end of file".to_string(),
-            RencError::InvalidKey(err) => err.clone(),
-            RencError::InvalidHeader(err) => err.clone(),
-            RencError::InvalidArguments(err) => err.clone(),
-            RencError::Crypto(err) => err.clone(),
-        }
-    }
 }
 
 impl std::fmt::Display for RencError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.message())
+        match self {
+            RencError::Io(err) => f.write_str(err),
+            RencError::InvalidMagic => f.write_str("Invalid magic header"),
+            RencError::UnsupportedVersion(v) => write!(f, "Unsupported version {v}"),
+            RencError::InvalidMode(m) => write!(f, "Invalid mode {m}"),
+            RencError::PasswordRequired => f.write_str("Password required"),
+            RencError::SecretKeyRequired => f.write_str("Secret key required"),
+            RencError::AuthenticationFailed => f.write_str("Authentication failed"),
+            RencError::InvalidEncryptedSize => f.write_str("Invalid encrypted size"),
+            RencError::UnexpectedEof => f.write_str("Unexpected end of file"),
+            RencError::InvalidKey(err) => f.write_str(err),
+            RencError::InvalidHeader(err) => f.write_str(err),
+            RencError::InvalidArguments(err) => f.write_str(err),
+            RencError::Crypto(err) => f.write_str(err),
+        }
     }
 }
 
@@ -104,21 +98,19 @@ pub struct DoneInfo {
 }
 
 /// Generate a new Ed25519 keypair (base64-encoded) for public-key mode.
-pub fn generate_keypair() -> Result<Keypair, RencError> {
-    let (public, secret) = crypto::keys::generate_ed25519_keypair()?;
-    let public_key_base64 = crypto::keys::encode_base64(&public);
-    let secret_key_base64 = crypto::keys::encode_base64(&secret);
-    Ok(Keypair {
-        public_key_base64,
-        secret_key_base64,
-    })
+pub fn generate_keypair() -> Keypair {
+    let (public, secret) = crypto::keys::generate_ed25519_keypair();
+    Keypair {
+        public_key_base64: crypto::keys::encode_base64(&public),
+        secret_key_base64: crypto::keys::encode_base64(&secret),
+    }
 }
 
 /// Read and parse the renc header from an encrypted file.
 pub fn read_header_from_file(path: &Path) -> Result<Header, RencError> {
     let file = File::open(path)?;
     let mut reader = BufReader::new(file);
-    format::header::Header::read_from(&mut reader)
+    Header::read_from(&mut reader)
 }
 
 /// Encrypt a file using a password-derived key (Argon2id).
@@ -128,19 +120,17 @@ pub fn encrypt_file_with_password(
     password: &[u8],
     mut progress: Option<&mut dyn FnMut(u64, f64) -> Result<(), RencError>>,
 ) -> Result<DoneInfo, RencError> {
-    let mut password_buf = password.to_vec();
     let mut input_file = BufReader::new(File::open(input)?);
     let mut output_file = BufWriter::new(File::create(output)?);
     let total_size = input.metadata()?.len();
 
-    let salt = crypto::keys::random_salt()?;
-    let nonce = crypto::keys::random_nonce()?;
+    let salt = crypto::keys::random_salt();
+    let nonce = crypto::keys::random_nonce();
     let kdf = KdfParams::password_default();
-    let mut key = crypto::kdf::derive_key(&password_buf, &salt, kdf)?;
+    let mut key = crypto::kdf::derive_key(password, &salt, kdf)?;
     let header = Header::new_password(kdf, salt, nonce);
 
-    let header_bytes = header.serialize();
-    output_file.write_all(&header_bytes)?;
+    output_file.write_all(&header.serialize())?;
 
     let hash_hex = format::stream::encrypt_stream(
         &mut input_file,
@@ -152,7 +142,6 @@ pub fn encrypt_file_with_password(
     )?;
 
     key.zeroize();
-    password_buf.zeroize();
 
     Ok(DoneInfo {
         output: output.to_path_buf(),
@@ -173,18 +162,17 @@ pub fn encrypt_file_with_pubkey(
 
     let recipient_public = crypto::keys::decode_base64_32(recipient_public_key_b64)?;
     let recipient_x25519 = crypto::keys::ed25519_public_to_x25519(&recipient_public)?;
-    let (mut ephemeral_secret, ephemeral_public) = crypto::keys::generate_x25519_ephemeral()?;
+    let (mut ephemeral_secret, ephemeral_public) = crypto::keys::generate_x25519_ephemeral();
     let mut shared_secret =
         crypto::keys::x25519_shared_secret(&ephemeral_secret, &recipient_x25519);
 
-    let salt = crypto::keys::random_salt()?;
-    let nonce = crypto::keys::random_nonce()?;
+    let salt = crypto::keys::random_salt();
+    let nonce = crypto::keys::random_nonce();
     let kdf = KdfParams::pubkey_default();
     let mut key = crypto::kdf::derive_key(&shared_secret, &salt, kdf)?;
     let header = Header::new_pubkey(kdf, salt, nonce, ephemeral_public);
 
-    let header_bytes = header.serialize();
-    output_file.write_all(&header_bytes)?;
+    output_file.write_all(&header.serialize())?;
 
     let hash_hex = format::stream::encrypt_stream(
         &mut input_file,
@@ -212,17 +200,16 @@ pub fn decrypt_file_with_password(
     password: &[u8],
     mut progress: Option<&mut dyn FnMut(u64, f64) -> Result<(), RencError>>,
 ) -> Result<DoneInfo, RencError> {
-    let mut password_buf = password.to_vec();
     let mut input_file = BufReader::new(File::open(input)?);
     let mut output_file = BufWriter::new(File::create(output)?);
     let encrypted_size = input.metadata()?.len();
 
-    let header = format::header::Header::read_from(&mut input_file)?;
+    let header = Header::read_from(&mut input_file)?;
     if header.mode != Mode::Password {
         return Err(RencError::InvalidMode(header.mode as u8));
     }
 
-    let mut key = crypto::kdf::derive_key(&password_buf, &header.salt, header.kdf)?;
+    let mut key = crypto::kdf::derive_key(password, &header.salt, header.kdf)?;
     let hash_hex = format::stream::decrypt_stream(
         &mut input_file,
         &mut output_file,
@@ -233,7 +220,6 @@ pub fn decrypt_file_with_password(
     )?;
 
     key.zeroize();
-    password_buf.zeroize();
 
     Ok(DoneInfo {
         output: output.to_path_buf(),
@@ -252,7 +238,7 @@ pub fn decrypt_file_with_secret(
     let mut output_file = BufWriter::new(File::create(output)?);
     let encrypted_size = input.metadata()?.len();
 
-    let header = format::header::Header::read_from(&mut input_file)?;
+    let header = Header::read_from(&mut input_file)?;
     if header.mode != Mode::Pubkey {
         return Err(RencError::InvalidMode(header.mode as u8));
     }
